@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Options</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font-family: sans-serif;
+        background-color: #f5f5f5;
+        user-select: none;
+      }
+      label {
+        display: block;
+        margin: 2px 0;
+      }
+      label-outer {
+        display: block;
+        margin: 2px 10px;
+      }
+      fieldset {
+        margin: 10px 10px;
+      }
+      legend {
+        font-weight: bold;
+      }
+      .content {
+        flex: 1;
+      }
+      .app-icon {
+        width: 96px;
+        height: auto;
+        margin-top: 1px;
+        margin-bottom: 0px;
+        user-select: none;
+      }
+      .paypal-icon {
+        width: 114px;
+        height: auto;
+        margin-top: 1px;
+        margin-bottom: 0px;
+        user-select: none;
+      }
+      .path-edit {
+        width: 100%;
+        background-color: #ccc;
+      }
+      .thanks {
+        font-size: 14px;
+        font-style: italic;
+        color: #dd4b12;
+        text-align: center;
+        margin-top: 10px;
+      }
+      .sponsor-container {
+        text-align: center;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .button-container {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      .button-container button {
+        margin: 0 10px;
+      }
+      .icon-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0px 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <fieldset>
+        <legend>Window</legend>
+        <label>
+          Transparency (%):
+          <input type="range" id="opacity-slider" min="10" max="100" value="100">
+          <span id="opacity-value">100</span>
+        </label>
+        <label>
+          <input type="checkbox" id="always-on-top-checkbox">
+          Always on Top
+        </label>
+        <label>
+          <input type="checkbox" id="clock-checkbox">
+          Show Clock
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Slideshow Directory</legend>
+        <input type="text" id="path-edit" class="path-edit" value="" readonly>
+        <label>
+          <input type="checkbox" id="include-subfolders-checkbox">
+          Include Subfolders
+        </label>
+        <label>
+          <input type="checkbox" id="shuffle-checkbox">
+          Shuffle Playlist
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Slideshow</legend>
+        <label>
+          Slideshow Time (seconds):
+          <input type="range" id="slideshow-time-slider" min="3" max="30" value="5">
+          <span id="slideshow-time-value">5</span>
+        </label>
+        <label>
+          <input type="checkbox" id="play-video-till-end-checkbox">
+          Full Video Playback (Ignore Slideshow Time)
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Sponsorship</legend>
+        <div class="thanks">Like this app? Buy me a coffee!</div>
+        <div class="sponsor-container">
+          <div class="icon-container">
+            <a href="https://qr.kakaopay.com/Ej8e5k8865dc01820" target="_blank">
+              <img src="assets/kakaopay.png" alt="App Icon" class="app-icon" draggable="false" />
+            </a>
+          </div>
+          <div class="icon-container">
+            <a href="https://www.paypal.me/EnarcheAhn" target="_blank">
+              <img src="assets/paypal.png" alt="App Icon" class="paypal-icon" draggable="false"/>
+            </a>
+          </div>
+          <div class="icon-container">
+            <img src="assets/BuyMeCoffee.png" alt="App Icon" class="app-icon" draggable="false" />
+            <a href="https://www.buymeacoffee.com/enarche" target="_blank"><img src="assets/BuyMeCoffeeButton.png" alt="Buy Me A Coffee" style="height: 24px !important;width: 87px !important;" ></a>
+          </div>
+        </div>
+        <div class="thanks">Thank you for your sponsorship.</div>
+      </fieldset>
+      <label-outer>
+        <input type="checkbox" id="update-checkbox">
+        Check for Updates
+      </label-outer>
+    </div>
+    <div class="button-container">
+      <button id="apply-options-btn">Apply</button>
+      <button id="cancel-options-btn">Cancel</button>
+    </div>
+    <script src="options.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const paypalLink = document.getElementById('paypal-link');
+        if (paypalLink && window.electron) {
+          paypalLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            const paypalUrl = event.target.href;
+            window.electron.openExternalLink(paypalUrl);
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

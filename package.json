@@ -1,0 +1,63 @@
+{
+  "name": "unifandora",
+  "version": "1.0.0",
+  "author": "EnArche",
+  "license": "MIT",
+  "buildNumber": 139,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enarche-ahn/unifandora-release"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "node increment-build.js && electron-builder --publish never",
+    "deploy": "node increment-build.js && cross-env NODE_ENV=production electron-builder --publish always",
+    "build": "cross-env NODE_ENV=production electron-builder"
+  },
+  "build": {
+    "asar": true,
+    "appId": "com.enarche.unifandora",
+    "publish": {
+      "provider": "github",
+      "owner": "enarche-ahn",
+      "repo": "unifandora-release"
+    },
+    "productName": "UniFandora",
+    "icon": "assets/icons/app-icon.png",
+    "files": [
+      "assets/icons/**",
+      "asset/font/SourceCodePro-Regular.ttf",
+      "asset/font/SourceCodePro-Bold.ttf",
+      "assets/kakaopay.png",
+      "assets/paypal.png",
+      "assets/BuyMeCoffee.png",
+      "assets/BuyMeCoffeeButton.png",
+      "assets/github.svg",
+      "about.html",
+      "main.js",
+      "index.html",
+      "increment-build.js",
+      "options.html",
+      "options.js",
+      "preload.js",
+      "renderer.js",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "mac": {
+      "identity": null
+    }
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  }
+}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>UniFandora</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f5f5f5;
+        font-family: sans-serif;
+        color: #333;
+        text-align: center;
+        user-select: none;
+      }
+      .container {
+        margin-top: 10px;
+      }
+      .app-icon {
+        width: 64px;
+        height: auto;
+        margin-top: 1px;
+        margin-bottom: 0px;
+      }
+      .paypal-icon {
+        width: 82px;
+        height: auto;
+        margin-top: 1px;
+        margin-bottom: 0px;
+        user-select: none;
+      }
+      .thanks {
+        font-size: 12px;
+        font-style: italic;
+        color: #dd4b12;
+        margin-bottom: 15px;
+      }
+      .sponsor-container {
+        text-align: center;
+        /* margin-bottom: 10px; */
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        margin-bottom: 10px;
+      }
+      .sponsor-container img {
+        margin: 0px 10px;
+      }
+      .app-name {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+      .version {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 2px;
+      }
+      .copyright {
+        font-size: 12px;
+        color: #666;
+      }
+      .icon-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0px 2px;
+      }
+      .github-link {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .github-link img {
+        width: 16px;
+        height: 16px;
+        margin-right: 5px;
+      }
+    </style>
+    <script>
+      window.versionString = '';
+      if (window.electronAPI && window.electronAPI.onSetVersion) {
+        window.electronAPI.onSetVersion((version) => {
+          window.versionString = version;
+          const versionElem = document.getElementById('app-version');
+          if (versionElem) {
+            versionElem.textContent = 'Ver ' + version;
+          }
+        });
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        const versionElem = document.getElementById('app-version');
+        if (versionElem && window.versionString) {
+          versionElem.textContent = 'Ver ' + window.versionString;
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="thanks">Like this app? Buy me a coffee!</div>
+        <div class="sponsor-container">
+          <div class="icon-container">
+            <a href="https://qr.kakaopay.com/Ej8e5k8865dc01820" target="_blank">
+              <img src="assets/kakaopay.png" alt="App Icon" class="app-icon" draggable="false" />
+            </a>
+          </div>
+          <div class="icon-container">
+            <a href="https://www.paypal.me/EnarcheAhn" target="_blank">
+              <img src="assets/paypal.png" alt="App Icon" class="paypal-icon" draggable="false"/>
+            </a>
+          </div>
+          <div class="icon-container">
+            <img src="assets/BuyMeCoffee.png" alt="App Icon" class="app-icon" draggable="false" />
+            <a href="https://www.buymeacoffee.com/enarche" target="_blank"><img src="assets/BuyMeCoffeeButton.png" alt="Buy Me A Coffee" style="height: 24px !important;width: 87px !important;" ></a>
+          </div>
+        </div>
+        <div class="thanks">Thank you for your sponsorship.</div>
+
+      <div class="app-name">UniFandora</div>
+      <div class="version"><span id="app-version"></span></div>
+      <div class="copyright">
+        Copyright © 2025 EnArche
+      </div>
+      <div class="github-link">
+        <img src="assets/github.svg" alt="GitHub Logo">
+        <a href="https://github.com/enarche-ahn/unifandora-release" target="_blank">EnArche</a>
+      </div>
+    </div>
+  </body>
+</html>
