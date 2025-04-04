@@ -1,9 +1,9 @@
 {
   "name": "unifandora",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "EnArche",
   "license": "MIT",
-  "buildNumber": 139,
+  "buildNumber": 145,
   "repository": {
     "type": "git",
     "url": "https://github.com/enarche-ahn/unifandora-release"

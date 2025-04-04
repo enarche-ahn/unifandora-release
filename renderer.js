@@ -9,6 +9,7 @@ let slideshowTimeoutId = null;
 let currentSlideshowActive = false;
 let lastFolderPath = null;
 let showClock = true;
+let transitionDuration = 1000;
 
 let slideshowFiles = [];
 let slideshowIndex = 0;
@@ -22,6 +23,7 @@ let isResizingProgrammatically = false;
 
 let currentMediaElement = null;
 let currentMediaType = '';
+let previousMediaElement = null;
 
 // Global function to return current configuration (for saving on exit)
 window.getCurrentConfig = function() {
@@ -52,6 +54,32 @@ function showAboutInfo() {
 
 window.addEventListener('DOMContentLoaded', () => {
   showAboutInfo();
+  
+  const style = document.createElement('style');
+  style.textContent = `
+    .media-element {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: opacity ${transitionDuration}ms ease;
+    }
+    .prev-media {
+      opacity: 1;
+    }
+    .current-media {
+      opacity: 0;
+    }
+    .fade-in {
+      opacity: 1;
+    }
+    .fade-out {
+      opacity: 0;
+    }
+  `;
+  document.head.appendChild(style);
 });
 
 // "Open Folder" button: Request folder and update config
@@ -174,7 +202,7 @@ function showPlayOverlay() {
   overlay.style.display = 'flex';
   overlay.style.alignItems = 'center';
   overlay.style.justifyContent = 'center';
-  overlay.style.zIndex = '10';
+  overlay.style.zIndex = '1000';
   overlay.style.color = '#fff';
   overlay.innerHTML = '▶';
   overlay.addEventListener('click', () => {
@@ -229,7 +257,7 @@ function showPauseMessage() {
   message.style.color = '#fff';
   updateMessageSize(message);
   message.style.textShadow = '2px 2px 4px rgba(0,0,0,0.7)';
-  message.style.zIndex = '11';
+  message.style.zIndex = '1001';
   message.innerHTML = 'Paused';
   if (getComputedStyle(display).position === 'static') {
     display.style.position = 'relative';
@@ -364,22 +392,40 @@ function startSlideshow(files) {
   isPaused = false;
   currentSlideshowActive = true;
   window.electronAPI.setSlideshowState(true);
+  
+  const display = document.getElementById('display');
+  display.style.position = 'relative';
+  display.innerHTML = '';
+  
   showNext();
 }
 
-// Show next slide
 function showNext() {
-  const display = document.getElementById('display');
-  display.innerHTML = '';
-  
   if (slideshowFiles.length === 0) {
     showAboutInfo();
     currentSlideshowActive = false;
     return;
   }
   
+  const display = document.getElementById('display');
   const file = slideshowFiles[slideshowIndex];
   const ext = file.split('.').pop().toLowerCase();
+  
+  if (currentMediaElement) {
+    if (previousMediaElement) {
+      display.removeChild(previousMediaElement);
+    }
+    previousMediaElement = currentMediaElement;
+    previousMediaElement.classList.remove('current-media');
+    previousMediaElement.classList.add('prev-media');
+    
+    setTimeout(() => {
+      if (previousMediaElement) {
+        previousMediaElement.classList.add('fade-out');
+      }
+    }, 50);
+  }
+  
   let element;
   
   if (['mp4', 'webm', 'ogg'].includes(ext)) {
@@ -389,6 +435,7 @@ function showNext() {
     element.muted = true;
     element.controls = false;
     element.autoplay = true;
+    element.classList.add('media-element', 'current-media');
     
     element.onerror = () => {
       clearTimeout(slideshowTimeoutId);
@@ -398,7 +445,12 @@ function showNext() {
     
     element.onloadedmetadata = () => {
       adjustWindowSize(element.videoWidth, element.videoHeight);
+      
+      setTimeout(() => {
+        element.classList.add('fade-in');
+      }, 50);
     };
+    
     display.appendChild(element);
     currentMediaElement = element;
     
@@ -417,6 +469,7 @@ function showNext() {
   } else {
     element = document.createElement('img');
     element.draggable = false;
+    element.classList.add('media-element', 'current-media');
     
     element.onerror = () => {
       clearTimeout(slideshowTimeoutId);
@@ -426,16 +479,29 @@ function showNext() {
     
     element.onload = () => {
       adjustWindowSize(element.naturalWidth, element.naturalHeight);
+      
+      setTimeout(() => {
+        element.classList.add('fade-in');
+      }, 50);
     };
+    
     element.src = file;
     display.appendChild(element);
     currentMediaElement = element;
     currentMediaType = (ext === 'gif') ? 'gif' : 'image';
+    
     slideshowTimeoutId = setTimeout(() => {
       slideshowIndex = (slideshowIndex + 1) % slideshowFiles.length;
       if (!isPaused) showNext();
     }, slideShowTime * 1000);
   }
+  
+  setTimeout(() => {
+    if (previousMediaElement && previousMediaElement.parentNode === display) {
+      display.removeChild(previousMediaElement);
+      previousMediaElement = null;
+    }
+  }, transitionDuration + 100);
 }
 
 // Toggle playback (pause/resume)
