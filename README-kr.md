@@ -11,7 +11,11 @@ UniFnadora는 당신의 덕질이 시작되는 곳이 되고 싶습니다.<br>
 <table>
   <tr>
     <td><img src="assets/help/running.gif" alt="Running" width="266" /></td>
-    <td><img src="assets/help/example.gif" alt="Example" width="320" /></td>
+    <td>
+      <a href="https://youtu.be/Bk4apkK9hVU?si=SxhOfx8X3i6jFjcd">
+        <img src="assets/help/example.gif" alt="Example" width="320" />
+      </a>
+    </td>
   </tr>
 </table>
 
