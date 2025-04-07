@@ -3,14 +3,6 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
-/**
- * By default,
- * electron-updater automatically downloads the update installer
- * and applies the update upon application exit.
- * Setting autoInstallOnAppQuit = false
- * prevents the update from being automatically installed
- * when the application is closed.
- */
 autoUpdater.autoInstallOnAppQuit = false;
 
 let mainWindow;
@@ -40,32 +32,7 @@ const menuTemplate = [
       {
         label: 'About',
         click: () => {
-          // Open custom about window (or use app.setAboutPanelOptions)
-          const aboutWindow = new BrowserWindow({
-            width: 350,
-            height: 350,
-            resizable: false,
-            autoHideMenuBar: true,
-            title: "UniFandora",
-            icon: path.join(__dirname, 'assets/icons/app-icon.png'),
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              preload: path.join(__dirname, 'preload.js') // preload 스크립트 지정
-            }
-          });
-          aboutWindow.loadFile('about.html');
-
-          aboutWindow.once('ready-to-show', () => {
-              aboutWindow.show();
-          });
-
-          aboutWindow.webContents.on('did-finish-load', () => {
-              const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
-              const version = app.getVersion();
-              const buildNumber = packageJson.buildNumber;
-              aboutWindow.webContents.send('set-version', `${version} (Build ${buildNumber})`);
-          });
+          createAboutWindow();
         }
       },
       { type: 'separator' },
@@ -78,7 +45,38 @@ const menuTemplate = [
 ];
 Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
-// Return full path to config.json in the user data folder
+/**
+ * Creates the About window.
+ */
+function createAboutWindow() {
+  const aboutWindow = new BrowserWindow({
+    width: 350,
+    height: 350,
+    resizable: false,
+    autoHideMenuBar: true,
+    title: "UniFandora",
+    icon: path.join(__dirname, 'assets/icons/app-icon.png'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+  aboutWindow.loadFile('about.html');
+  aboutWindow.once('ready-to-show', () => {
+    aboutWindow.show();
+  });
+  aboutWindow.webContents.on('did-finish-load', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    const version = app.getVersion();
+    const buildNumber = packageJson.buildNumber;
+    aboutWindow.webContents.send('set-version', `${version} (Build ${buildNumber})`);
+  });
+}
+
+/**
+ * Returns the full path to the configuration file.
+ */
 function getConfigPath() {
   // macOS: ~/Library/Application Support/YourAppName
   // Windows: %AppData%/YourAppName
@@ -87,7 +85,9 @@ function getConfigPath() {
   return path.join(userData, 'config.json');
 }
 
-// Load configuration from config.json (from userData folder)
+/**
+ * Loads configuration from the config file.
+ */
 function loadConfig() {
   const configFile = getConfigPath();
   let config = {};
@@ -99,17 +99,17 @@ function loadConfig() {
   } catch (err) {
     console.error('Error reading config file:', err);
   }
-  
   for (const key in defaultConfig) {
     if (!(key in config)) {
       config[key] = defaultConfig[key];
     }
   }
-  
   return config;
 }
 
-// Save configuration to config.json in the userData folder
+/**
+ * Saves the provided configuration to the config file.
+ */
 function saveConfig(config) {
   const configFile = getConfigPath();
   try {
@@ -119,7 +119,9 @@ function saveConfig(config) {
   }
 }
 
-// Recursive directory walk with error handling (skip errors like EPERM)
+/**
+ * Recursively scans a directory and collects files with allowed extensions.
+ */
 function walkDir(dir, allowedExts, files) {
   let items;
   try {
@@ -145,22 +147,27 @@ function walkDir(dir, allowedExts, files) {
   }
 }
 
+/**
+ * Sends a message to the renderer process.
+ */
 function writeMessageToWindow(text) {
   mainWindow.webContents.send("message", text);
 }
 
+/**
+ * Creates the main application window.
+ */
 function createWindow() {
   const config = loadConfig();
   const opacity = config.opacity !== undefined ? config.opacity : 100;
 
-  // Create the main window with restored size, position, alwaysOnTop, opacity, and transparent background.
   mainWindow = new BrowserWindow({
     width: config.windowWidth || 400,
     height: config.windowHeight || 300,
     x: config.windowX,
     y: config.windowY,
     frame: false,
-    transparent: true, // Enable transparent background
+    transparent: true,
     autoHideMenuBar: true,
     alwaysOnTop: config.alwaysOnTop || false,
     icon: path.join(__dirname, 'assets/icons/app-icon.png'),
@@ -172,13 +179,11 @@ function createWindow() {
   });
   mainWindow.loadFile('index.html');
   mainWindow.setOpacity(opacity / 100);
-
-  // (config.checkUpdate && process.platform !== 'darwin')
   if (config.checkUpdate) {
     autoUpdater.checkForUpdatesAndNotify();
   }
 
-  // Save window bounds and final options on close (including last folder & options)
+  // Save current configuration when closing the window.
   mainWindow.on('close', (e) => {
     e.preventDefault();
     mainWindow.webContents.executeJavaScript('window.getCurrentConfig && window.getCurrentConfig()')
@@ -203,32 +208,20 @@ function createWindow() {
       });
   });
 
-  // Add a context menu with toggle, "Open Folder", "Options", and "Quit"
+  // Set up context menu for playback and options.
   mainWindow.webContents.on('context-menu', (event, params) => {
     const toggleLabel = isSlideshowPlaying ? 'Pause' : 'Play';
     const menu = Menu.buildFromTemplate([
-      { 
-        label: toggleLabel, 
-        click: () => { mainWindow.webContents.send('context-menu-command', 'toggle-playback'); } 
-      },
-      { 
-        label: 'Open Folder', 
-        click: () => { mainWindow.webContents.send('context-menu-command', 'open-folder'); } 
-      },
-      { 
-        label: 'Options', 
-        click: () => { mainWindow.webContents.send('context-menu-command', 'options'); } 
-      },
+      { label: toggleLabel, click: () => { mainWindow.webContents.send('context-menu-command', 'toggle-playback'); } },
+      { label: 'Open Folder', click: () => { mainWindow.webContents.send('context-menu-command', 'open-folder'); } },
+      { label: 'Options', click: () => { mainWindow.webContents.send('context-menu-command', 'options'); } },
       { type: 'separator' },
-      { 
-        label: 'Exit', 
-        click: () => { app.quit(); } 
-      }
+      { label: 'Exit', click: () => { app.quit(); } }
     ]);
     menu.popup({ window: mainWindow });
   });
-  
-  // If lastFolderPath exists in config and the folder exists, auto-start slideshow.
+
+  // Auto-start slideshow if a previous folder is set.
   if (config.lastFolderPath && fs.existsSync(config.lastFolderPath)) {
     mainWindow.webContents.on('did-finish-load', () => {
       mainWindow.webContents.send('auto-start-folder', config);
@@ -238,14 +231,19 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-// IPC handler: Returns saved configuration to renderer
-ipcMain.handle('get-config', () => {
-  return loadConfig();
-});
+// IPC handlers and listeners
 
-// IPC handler: Open folder and return file list
+ipcMain.handle('get-config', () => loadConfig());
+
+/**
+ * IPC handler for selecting a folder.
+ * On macOS, forces the main window to gain focus before opening the dialog.
+ */
 ipcMain.handle('select-folder', async (event, options) => {
-  const result = await dialog.showOpenDialog({
+  if (process.platform === 'darwin' && mainWindow) {
+    mainWindow.focus();
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
   });
   if (result.canceled) {
@@ -268,11 +266,8 @@ ipcMain.handle('select-folder', async (event, options) => {
   return { files, folderPath };
 });
 
-// IPC handler: Load folder from given path
 ipcMain.handle('load-folder-from-path', async (event, folderPath, options) => {
-  if (!fs.existsSync(folderPath)) {
-    return [];
-  }
+  if (!fs.existsSync(folderPath)) return [];
   const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.webm', '.ogg'];
   let files = [];
   if (options && options.includeSubfolders) {
@@ -289,37 +284,31 @@ ipcMain.handle('load-folder-from-path', async (event, folderPath, options) => {
   return files;
 });
 
-// IPC handler: Resize window
 ipcMain.handle('resize-window', async (event, newWidth, newHeight) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win.setSize(Math.round(newWidth), Math.round(newHeight));
 });
 
-// IPC handler: Get window position
 ipcMain.handle('get-window-position', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   return win.getPosition();
 });
 
-// IPC handler: Move window
 ipcMain.on('move-window', (event, newX, newY) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   win.setPosition(Math.round(newX), Math.round(newY));
 });
 
-// IPC handler: Update slideshow playing state
 ipcMain.on('set-slideshow-state', (event, playing) => {
   isSlideshowPlaying = playing;
 });
 
-// IPC handler: Save configuration from renderer
 ipcMain.on('save-config', (event, newConfig) => {
   const config = loadConfig();
   const mergedConfig = { ...config, ...newConfig };
   saveConfig(mergedConfig);
 });
 
-// IPC handler: Open options window (separate from main window)
 ipcMain.on('open-options', (event) => {
   if (optionsWindow) {
     optionsWindow.focus();
@@ -338,12 +327,9 @@ ipcMain.on('open-options', (event) => {
     }
   });
   optionsWindow.loadFile('options.html');
-  optionsWindow.on('closed', () => {
-    optionsWindow = null;
-  });
+  optionsWindow.on('closed', () => { optionsWindow = null; });
 });
 
-// IPC handler: Update options from options window
 ipcMain.on('update-options', (event, newOptions) => {
   let config = loadConfig();
   Object.assign(config, newOptions);
@@ -359,36 +345,26 @@ ipcMain.on('update-options', (event, newOptions) => {
   }
 });
 
-// Called when checking for a new update version
+// Auto-updater event listeners
+
 autoUpdater.on("checking-for-update", () => {
   writeMessageToWindow("Checking for updates...");
 });
-
-// Called when a new update version is available
 autoUpdater.on("update-available", () => {
   writeMessageToWindow("A new version is available and ready to update.");
 });
-
-// Called when there are no new update versions available
 autoUpdater.on("update-not-available", () => {
   writeMessageToWindow("You are using the latest version.");
 });
-
-// Called when an error occurs during update checking
 autoUpdater.on("error", (err) => {
   writeMessageToWindow("Error occurred: " + err);
 });
-
-// Receives download progress of the update file
 autoUpdater.on("download-progress", (progressObj) => {
   let progressMsg = "Downloaded " + progressObj.percent + "%";
   writeMessageToWindow(progressMsg);
 });
-
-// Called when the update file download completes; prompts user to install
 autoUpdater.on("update-downloaded", (info) => {
   writeMessageToWindow("Update file downloaded successfully.");
-
   const option = {
     type: "question",
     buttons: ["Yes", "No"],
@@ -396,21 +372,21 @@ autoUpdater.on("update-downloaded", (info) => {
     title: "UPDATER",
     message: "Would you like to install the update now?",
   };
-
-  dialog.showMessageBox(mainWindow, option).then(function(res){
+  dialog.showMessageBox(mainWindow, option).then(function(res) {
     writeMessageToWindow(res.response.toString());
-
-    // res.response corresponds to the index of option.buttons above
-    if(res.response == 0){
+    if (res.response == 0) {
       writeMessageToWindow('Closing application and installing update...');
       autoUpdater.quitAndInstall();
-    }
-    else{
+    } else {
       writeMessageToWindow('Update postponed by the user.');
     }
   });
 });
-
 ipcMain.on('restart_app', () => {
   autoUpdater.quitAndInstall();
+});
+
+// Log messages received from renderer
+ipcMain.on('renderer-log', (event, message) => {
+  console.log('Renderer Log:', message);
 });
