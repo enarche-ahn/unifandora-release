@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+/**
+ * Expose a safe API to the renderer process.
+ */
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: (options) => ipcRenderer.invoke('select-folder', options),
   onContextMenuCommand: (callback) => ipcRenderer.on('context-menu-command', callback),
@@ -15,5 +18,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateOptions: (options) => ipcRenderer.send('update-options', options),
   onOptionsUpdated: (callback) => ipcRenderer.on('options-updated', callback),
   onSetVersion: (callback) => ipcRenderer.on('set-version', (_event, value) => callback(value)),
-  onMessage: (callback) => ipcRenderer.on('message', (_event, text) => callback(text))
+  onMessage: (callback) => ipcRenderer.on('message', (_event, text) => callback(text)),
+  sendLog: (message) => ipcRenderer.send('renderer-log', message)
 });

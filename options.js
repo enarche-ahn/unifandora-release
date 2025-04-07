@@ -1,3 +1,5 @@
+// This script loads current options and applies changes via IPC.
+
 window.addEventListener('DOMContentLoaded', async () => {
   const config = await window.electronAPI.getConfig();
   const pathEdit = document.getElementById("path-edit");

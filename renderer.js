@@ -1,42 +1,57 @@
-// Global option variables (default values)
+// Override console.log to forward log messages to the main process.
+(function() {
+  const originalConsoleLog = console.log;
+  console.log = function(...args) {
+    if (window.electronAPI && typeof window.electronAPI.sendLog === 'function') {
+      window.electronAPI.sendLog(args.join(' '));
+    }
+    originalConsoleLog.apply(console, args);
+  };
+})();
+
+/* Global option variables and slideshow state */
 let slideShowTime = 5;
 let includeSubfolders = true;
 let shuffle = true;
 let checkUpdate = true;
 let playVideoTillEndOption = false;
-let windowOpacity = 100; // New variable for opacity (default 100%)
+let windowOpacity = 100;
 let slideshowTimeoutId = null;
 let currentSlideshowActive = false;
 let lastFolderPath = null;
 let showClock = true;
-
+let transitionDuration = 1000;
 let slideshowFiles = [];
 let slideshowIndex = 0;
 let isPaused = false;
-
 let currentMediaNaturalWidth = 0;
 let currentMediaNaturalHeight = 0;
 let prevWindowWidth = window.innerWidth;
 let prevWindowHeight = window.innerHeight;
 let isResizingProgrammatically = false;
-
 let currentMediaElement = null;
 let currentMediaType = '';
+let previousMediaElement = null;
 
-// Global function to return current configuration (for saving on exit)
+/**
+ * Returns the current configuration for saving on exit.
+ */
 window.getCurrentConfig = function() {
   return {
-    lastFolderPath: lastFolderPath,
-    includeSubfolders: includeSubfolders,
-    shuffle: shuffle,
-    showClock: showClock,
-    checkUpdate: checkUpdate,
-    slideShowTime: slideShowTime,
-    playVideoTillEndOption: playVideoTillEndOption,
+    lastFolderPath,
+    includeSubfolders,
+    shuffle,
+    showClock,
+    checkUpdate,
+    slideShowTime,
+    playVideoTillEndOption,
     opacity: windowOpacity
   };
 };
 
+/**
+ * Displays about information on the main display.
+ */
 function showAboutInfo() {
   const display = document.getElementById('display');
   display.innerHTML = `
@@ -52,9 +67,35 @@ function showAboutInfo() {
 
 window.addEventListener('DOMContentLoaded', () => {
   showAboutInfo();
+  const style = document.createElement('style');
+  style.textContent = `
+    .media-element {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: opacity ${transitionDuration}ms ease;
+    }
+    .prev-media { opacity: 1; }
+    .current-media { opacity: 0; }
+    .fade-in { opacity: 1; }
+    .fade-out { opacity: 0; }
+  `;
+  document.head.appendChild(style);
+  console.log('Slideshow started...');
 });
 
-// "Open Folder" button: Request folder and update config
+window.addEventListener('resize', () => {
+  updatePlayOverlay();
+  const message = document.getElementById('pause-message');
+  if (message) {
+    updateMessageSize(message);
+  }
+});
+
+// Event handler for "Open Folder" button.
 document.getElementById('open-folder-btn').addEventListener('click', async () => {
   const result = await window.electronAPI.selectFolder({ includeSubfolders });
   if (result && result.files && result.files.length > 0) {
@@ -63,28 +104,30 @@ document.getElementById('open-folder-btn').addEventListener('click', async () =>
       slideshowTimeoutId = null;
       document.getElementById('display').innerHTML = '';
       currentSlideshowActive = false;
+      currentMediaElement = null;
+      previousMediaElement = null;
     }
     lastFolderPath = result.folderPath;
     const config = {
-      lastFolderPath: lastFolderPath,
-      includeSubfolders: includeSubfolders,
-      shuffle: shuffle,
-      showClock: showClock,
-      checkUpdate: checkUpdate,
-      slideShowTime: slideShowTime,
-      playVideoTillEndOption: playVideoTillEndOption
+      lastFolderPath,
+      includeSubfolders,
+      shuffle,
+      showClock,
+      checkUpdate,
+      slideShowTime,
+      playVideoTillEndOption
     };
     window.electronAPI.saveConfig(config);
     startSlideshow(result.files);
   }
 });
 
-// "Options" button: Request to open the separate options window
+// Event handler for "Options" button.
 document.getElementById('options-btn').addEventListener('click', () => {
   window.electronAPI.openOptions();
 });
 
-// Listen for updated options from options window
+// Listener for updated options.
 window.electronAPI.onOptionsUpdated((event, newOptions) => {
   includeSubfolders = newOptions.includeSubfolders;
   shuffle = newOptions.shuffle;
@@ -95,7 +138,7 @@ window.electronAPI.onOptionsUpdated((event, newOptions) => {
   windowOpacity = newOptions.opacity;
 });
 
-// Listen for context menu commands
+// Listener for context menu commands.
 window.electronAPI.onContextMenuCommand((event, command) => {
   if (command === 'open-folder') {
     document.getElementById('open-folder-btn').click();
@@ -106,7 +149,7 @@ window.electronAPI.onContextMenuCommand((event, command) => {
   }
 });
 
-// Listen for auto-start folder command
+// Listener for auto-start folder command.
 window.electronAPI.onAutoStartFolder(async (event, config) => {
   includeSubfolders = config.includeSubfolders;
   shuffle = config.shuffle;
@@ -123,16 +166,13 @@ window.electronAPI.onAutoStartFolder(async (event, config) => {
   }
 });
 
-// Custom window dragging functionality (only left mouse button)
+/**
+ * Implements custom window dragging functionality.
+ */
 const display = document.getElementById('display');
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let windowStartX = 0;
-let windowStartY = 0;
-
+let isDragging = false, dragStartX = 0, dragStartY = 0, windowStartX = 0, windowStartY = 0;
 display.addEventListener('mousedown', async (e) => {
-  if (e.button !== 0) return; // Only allow left-click dragging
+  if (e.button !== 0) return;
   isDragging = true;
   dragStartX = e.screenX;
   dragStartY = e.screenY;
@@ -140,12 +180,7 @@ display.addEventListener('mousedown', async (e) => {
   windowStartX = pos[0];
   windowStartY = pos[1];
 });
-
-// Cancel dragging on contextmenu event
-display.addEventListener('contextmenu', (e) => {
-  isDragging = false;
-});
-
+display.addEventListener('contextmenu', (e) => { isDragging = false; });
 window.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
   const offsetX = e.screenX - dragStartX;
@@ -154,12 +189,11 @@ window.addEventListener('mousemove', (e) => {
   const newY = windowStartY + offsetY;
   window.electronAPI.moveWindow(newX, newY);
 });
+window.addEventListener('mouseup', () => { isDragging = false; });
 
-window.addEventListener('mouseup', () => {
-  isDragging = false;
-});
-
-// Show play overlay icon with black circular background
+/**
+ * Displays a play overlay icon and pause message.
+ */
 function showPlayOverlay() {
   let overlay = document.createElement('div');
   overlay.id = 'play-overlay';
@@ -174,12 +208,10 @@ function showPlayOverlay() {
   overlay.style.display = 'flex';
   overlay.style.alignItems = 'center';
   overlay.style.justifyContent = 'center';
-  overlay.style.zIndex = '10';
+  overlay.style.zIndex = '1000';
   overlay.style.color = '#fff';
   overlay.innerHTML = '▶';
-  overlay.addEventListener('click', () => {
-    togglePlayback();
-  });
+  overlay.addEventListener('click', () => { togglePlayback(); });
   if (getComputedStyle(display).position === 'static') {
     display.style.position = 'relative';
   }
@@ -187,7 +219,9 @@ function showPlayOverlay() {
   showPauseMessage();
 }
 
-// Update overlay size based on current window dimensions
+/**
+ * Updates the size of the play overlay based on the window dimensions.
+ */
 function updatePlayOverlaySize(overlay) {
   let size = Math.min(window.innerWidth, window.innerHeight) * 0.9;
   overlay.style.width = size + 'px';
@@ -197,28 +231,34 @@ function updatePlayOverlaySize(overlay) {
   overlay.style.lineHeight = size + 'px';
 }
 
+/**
+ * Updates the font size of a message element.
+ */
 function updateMessageSize(message) {
   let size = Math.min(window.innerWidth, window.innerHeight) * 0.9;
   message.style.fontSize = (size * 0.15) + 'px';
 }
 
+/**
+ * Updates the play overlay if it exists.
+ */
 function updatePlayOverlay() {
   const overlay = document.getElementById('play-overlay');
-  if (overlay) {
-    updatePlayOverlaySize(overlay);
-  }
+  if (overlay) { updatePlayOverlaySize(overlay); }
 }
 
-// Hide and remove the play overlay and pause message
+/**
+ * Hides and removes the play overlay and pause message.
+ */
 function hidePlayOverlay() {
   const overlay = document.getElementById('play-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
+  if (overlay) { overlay.remove(); }
   hidePauseMessage();
 }
 
-// Show pause message at top center
+/**
+ * Shows a "Paused" message on the display.
+ */
 function showPauseMessage() {
   let message = document.createElement('div');
   message.id = 'pause-message';
@@ -229,7 +269,7 @@ function showPauseMessage() {
   message.style.color = '#fff';
   updateMessageSize(message);
   message.style.textShadow = '2px 2px 4px rgba(0,0,0,0.7)';
-  message.style.zIndex = '11';
+  message.style.zIndex = '1001';
   message.innerHTML = 'Paused';
   if (getComputedStyle(display).position === 'static') {
     display.style.position = 'relative';
@@ -237,30 +277,41 @@ function showPauseMessage() {
   display.appendChild(message);
 }
 
-// Hide pause message if exists
+/**
+ * Hides the pause message if present.
+ */
 function hidePauseMessage() {
   const message = document.getElementById('pause-message');
-  if (message) {
-    message.remove();
-  }
+  if (message) { message.remove(); }
 }
 
-// Update overlay size on window resize (immediate update)
-window.addEventListener('resize', () => {
-  updatePlayOverlay();
-  const message = document.getElementById('pause-message');
-  if (message) {
-    updateMessageSize(message);
+/**
+ * Adjusts the window size based on media's natural dimensions.
+ */
+function adjustWindowSize(naturalWidth, naturalHeight) {
+  currentMediaNaturalWidth = naturalWidth;
+  currentMediaNaturalHeight = naturalHeight;
+  let fixedWidth = window.innerWidth;
+  if (naturalWidth < fixedWidth) { fixedWidth = naturalWidth; }
+  let newWidth = fixedWidth;
+  let newHeight = Math.round(newWidth * naturalHeight / naturalWidth);
+  const screenHeight = window.screen.height;
+  if (newHeight > screenHeight) {
+    newHeight = screenHeight;
+    newWidth = Math.round(newHeight * naturalWidth / naturalHeight);
   }
-});
+  safeResizeWindow(newWidth, newHeight);
+  prevWindowWidth = newWidth;
+  prevWindowHeight = newHeight;
+}
 
-// Helper function to resize window considering Windows frame adjustments
+/**
+ * Safely resizes the window accounting for platform-specific adjustments.
+ */
 function safeResizeWindow(contentWidth, contentHeight) {
   let adjustedWidth = contentWidth;
   let adjustedHeight = contentHeight;
-  // Check if running on Windows
   if (navigator.userAgent.indexOf("Windows") > -1) {
-    // Calculate the difference between outer and inner dimensions (frame and title bar)
     const frameWidth = window.outerWidth - window.innerWidth;
     const frameHeight = window.outerHeight - window.innerHeight;
     adjustedWidth = contentWidth + frameWidth;
@@ -269,13 +320,12 @@ function safeResizeWindow(contentWidth, contentHeight) {
   return window.electronAPI.resizeWindow(adjustedWidth, adjustedHeight);
 }
 
-// Debounced auto-resize to maintain media aspect ratio during window resize
+/**
+ * Debounces window resize events to adjust media aspect ratio.
+ */
 let resizeDebounceTimer = null;
 window.addEventListener('resize', () => {
-  if (!currentSlideshowActive) return;
-  if (!currentMediaNaturalWidth || !currentMediaNaturalHeight) return;
-  if (isResizingProgrammatically) return;
-
+  if (!currentSlideshowActive || !currentMediaNaturalWidth || !currentMediaNaturalHeight || isResizingProgrammatically) return;
   clearTimeout(resizeDebounceTimer);
   resizeDebounceTimer = setTimeout(() => {
     const newWidth = window.innerWidth;
@@ -283,9 +333,7 @@ window.addEventListener('resize', () => {
     const deltaW = Math.abs(newWidth - prevWindowWidth);
     const deltaH = Math.abs(newHeight - prevWindowHeight);
     if (deltaW < 2 && deltaH < 2) return;
-    
     isResizingProgrammatically = true;
-  
     if (deltaW >= deltaH) {
       const adjustedHeight = Math.round(newWidth * currentMediaNaturalHeight / currentMediaNaturalWidth);
       safeResizeWindow(newWidth, adjustedHeight).then(() => {
@@ -301,59 +349,33 @@ window.addEventListener('resize', () => {
         isResizingProgrammatically = false;
       });
     }
-  }, 300); // 300ms debounce delay
+  }, 300);
 });
 
-// Adjust window size based on media's natural dimensions
-function adjustWindowSize(naturalWidth, naturalHeight) {
-  currentMediaNaturalWidth = naturalWidth;
-  currentMediaNaturalHeight = naturalHeight;
-  let fixedWidth = window.innerWidth;
-  if (naturalWidth < fixedWidth) {
-    fixedWidth = naturalWidth;
-  }
-  let newWidth = fixedWidth;
-  let newHeight = Math.round(newWidth * naturalHeight / naturalWidth);
-  const screenHeight = window.screen.height;
-  if (newHeight > screenHeight) {
-    newHeight = screenHeight;
-    newWidth = Math.round(newHeight * naturalWidth / naturalHeight);
-  }
-  safeResizeWindow(newWidth, newHeight);
-  prevWindowWidth = newWidth;
-  prevWindowHeight = newHeight;
-}
-
+/**
+ * Updates the time display.
+ */
 let flicker = true;
 function updateTime() {
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
   let timeString = '';
   if (showClock) {
-    if (flicker) {
-      //timeString = `${hours}:${minutes}:${seconds}`;
-      timeString = `${hours}:${minutes}`;
-    } else {
-      //timeString = `${hours}:${minutes}:${seconds}`;
-      timeString = `${hours}  ${minutes}`;
-    }
+    timeString = flicker ? `${hours}:${minutes}` : `${hours}  ${minutes}`;
     flicker = !flicker;
   }
-
   const timeDisplay = document.getElementById('time-display');
-  if (timeDisplay) {
-    timeDisplay.textContent = timeString;
-  }
+  if (timeDisplay) { timeDisplay.textContent = timeString; }
 }
 setInterval(updateTime, 1000);
 updateTime();
 
-// Start slideshow with given file list
+/**
+ * Starts the slideshow with the given file list.
+ */
 function startSlideshow(files) {
   if (shuffle) {
-    // Shuffle the files array using Fisher-Yates algorithm
     for (let i = files.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [files[i], files[j]] = [files[j], files[i]];
@@ -363,24 +385,45 @@ function startSlideshow(files) {
   slideshowIndex = 0;
   isPaused = false;
   currentSlideshowActive = true;
+  currentMediaElement = null;
+  previousMediaElement = null;
   window.electronAPI.setSlideshowState(true);
+  const display = document.getElementById('display');
+  display.style.position = 'relative';
+  display.innerHTML = '';
   showNext();
 }
 
+/**
+ * Displays the next media element in the slideshow.
+ */
 function showNext() {
-  const display = document.getElementById('display');
-  display.innerHTML = '';
-  
   if (slideshowFiles.length === 0) {
     showAboutInfo();
     currentSlideshowActive = false;
     return;
   }
-  
+  const display = document.getElementById('display');
   const file = slideshowFiles[slideshowIndex];
   const ext = file.split('.').pop().toLowerCase();
-  let element;
+
+  if (currentMediaElement) {
+    if (previousMediaElement && display.contains(previousMediaElement)) {
+      display.removeChild(previousMediaElement);
+    } else {
+      previousMediaElement = null;
+    }
+    previousMediaElement = currentMediaElement;
+    previousMediaElement.classList.remove('current-media');
+    previousMediaElement.classList.add('prev-media');
+    setTimeout(() => {
+      if (previousMediaElement) {
+        previousMediaElement.classList.add('fade-out');
+      }
+    }, 50);
+  }
   
+  let element;
   if (['mp4', 'webm', 'ogg'].includes(ext)) {
     currentMediaType = 'video';
     element = document.createElement('video');
@@ -388,19 +431,18 @@ function showNext() {
     element.muted = true;
     element.controls = false;
     element.autoplay = true;
-    
+    element.classList.add('media-element', 'current-media');
     element.onerror = () => {
       clearTimeout(slideshowTimeoutId);
       slideshowIndex = (slideshowIndex + 1) % slideshowFiles.length;
       if (!isPaused) showNext();
     };
-    
     element.onloadedmetadata = () => {
       adjustWindowSize(element.videoWidth, element.videoHeight);
+      setTimeout(() => { element.classList.add('fade-in'); }, 50);
     };
     display.appendChild(element);
     currentMediaElement = element;
-    
     if (playVideoTillEndOption) {
       element.addEventListener('ended', () => {
         slideshowIndex = (slideshowIndex + 1) % slideshowFiles.length;
@@ -412,19 +454,18 @@ function showNext() {
         if (!isPaused) showNext();
       }, slideShowTime * 1000);
     }
-    
   } else {
     element = document.createElement('img');
     element.draggable = false;
-    
+    element.classList.add('media-element', 'current-media');
     element.onerror = () => {
       clearTimeout(slideshowTimeoutId);
       slideshowIndex = (slideshowIndex + 1) % slideshowFiles.length;
       if (!isPaused) showNext();
     };
-    
     element.onload = () => {
       adjustWindowSize(element.naturalWidth, element.naturalHeight);
+      setTimeout(() => { element.classList.add('fade-in'); }, 50);
     };
     element.src = file;
     display.appendChild(element);
@@ -435,9 +476,18 @@ function showNext() {
       if (!isPaused) showNext();
     }, slideShowTime * 1000);
   }
+  
+  setTimeout(() => {
+    if (previousMediaElement && previousMediaElement.parentNode === display) {
+      display.removeChild(previousMediaElement);
+      previousMediaElement = null;
+    }
+  }, transitionDuration + 100);
 }
 
-// Toggle playback (pause/resume)
+/**
+ * Toggles playback (pause/resume) of the slideshow.
+ */
 function togglePlayback() {
   if (!currentSlideshowActive) return;
   if (!isPaused) {
